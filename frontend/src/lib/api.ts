@@ -1,7 +1,13 @@
 import axios from 'axios';
 import { SurpriseData, Reply } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const apiUrlFromEnv = import.meta.env.VITE_API_URL?.trim();
+const API_URL =
+  apiUrlFromEnv || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin);
+
+if (!apiUrlFromEnv && !import.meta.env.DEV) {
+  console.warn('VITE_API_URL is missing in production. Falling back to current origin.');
+}
 
 const api = axios.create({
   baseURL: API_URL,

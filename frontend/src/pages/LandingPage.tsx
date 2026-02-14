@@ -42,7 +42,7 @@ const LandingPage = ({ onNext, recipientName }: LandingPageProps) => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.45 }}
           >
-            Untuk <span className="font-bold text-valentine-red">{recipientName}</span>
+            Untuk Natasya Rachmawati <span className="font-bold text-valentine-red">{recipientName}</span>
           </motion.p>
 
           <motion.p
