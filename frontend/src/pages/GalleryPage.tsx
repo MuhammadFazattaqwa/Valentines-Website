@@ -7,6 +7,16 @@ interface GalleryPageProps {
   gallery: Gallery[];
 }
 
+const optimizeImageUrl = (url: string, width: number, quality = 70) => {
+  if (!url.includes('/storage/v1/object/public/')) {
+    return url;
+  }
+
+  const transformed = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+  const separator = transformed.includes('?') ? '&' : '?';
+  return `${transformed}${separator}width=${width}&quality=${quality}&resize=cover`;
+};
+
 const GalleryPage = ({ onNext, gallery }: GalleryPageProps) => {
   const [selectedImage, setSelectedImage] = useState<Gallery | null>(null);
 
@@ -41,10 +51,20 @@ const GalleryPage = ({ onNext, gallery }: GalleryPageProps) => {
                   onClick={() => setSelectedImage(item)}
                 >
                   <img
-                    src={item.image_url}
+                    src={optimizeImageUrl(item.image_url, 900, 65)}
+                    data-original-src={item.image_url}
                     alt={item.caption}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    loading="lazy"
+                    loading={index < 3 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    fetchPriority={index < 3 ? 'high' : 'auto'}
+                    onError={(event) => {
+                      const image = event.currentTarget;
+                      const original = image.dataset.originalSrc;
+                      if (original && image.src !== original) {
+                        image.src = original;
+                      }
+                    }}
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-4 pt-8">
                     <p className="text-sm font-medium text-white line-clamp-2">{item.caption}</p>
@@ -86,9 +106,19 @@ const GalleryPage = ({ onNext, gallery }: GalleryPageProps) => {
               onClick={(event) => event.stopPropagation()}
             >
               <img
-                src={selectedImage.image_url}
+                src={optimizeImageUrl(selectedImage.image_url, 1600, 78)}
+                data-original-src={selectedImage.image_url}
                 alt={selectedImage.caption}
                 className="max-h-[65vh] w-full rounded-2xl object-contain bg-black/20"
+                loading="eager"
+                decoding="async"
+                onError={(event) => {
+                  const image = event.currentTarget;
+                  const original = image.dataset.originalSrc;
+                  if (original && image.src !== original) {
+                    image.src = original;
+                  }
+                }}
               />
               <div className="flex items-center justify-between gap-4 px-2 pb-2 pt-4">
                 <p className="text-sm font-medium text-slate-700 sm:text-base">{selectedImage.caption}</p>
