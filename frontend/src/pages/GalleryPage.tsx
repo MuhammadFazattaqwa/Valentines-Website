@@ -14,7 +14,7 @@ const optimizeImageUrl = (url: string, width: number, quality = 70) => {
 
   const transformed = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
   const separator = transformed.includes('?') ? '&' : '?';
-  return `${transformed}${separator}width=${width}&quality=${quality}&resize=cover`;
+  return `${transformed}${separator}width=${width}&quality=${quality}&format=webp`;
 };
 
 const GalleryPage = ({ onNext, gallery }: GalleryPageProps) => {
