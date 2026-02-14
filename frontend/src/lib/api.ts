@@ -4,10 +4,12 @@ import { SurpriseData, Reply, Surprise, Gallery, QuizQuestion } from '../types';
 
 const apiUrlFromEnv = import.meta.env.VITE_API_URL?.trim();
 const hasBackendApi = Boolean(apiUrlFromEnv);
+const REQUEST_TIMEOUT_MS = 12_000;
 
 const api = hasBackendApi
   ? axios.create({
       baseURL: apiUrlFromEnv,
+      timeout: REQUEST_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -73,9 +75,9 @@ const fetchSurpriseFromSupabase = async (code: string): Promise<SurpriseData> =>
   };
 };
 
-export const getSurprise = async (code: string): Promise<SurpriseData> => {
+const fetchSurpriseFromApi = async (code: string): Promise<SurpriseData> => {
   if (!api) {
-    return fetchSurpriseFromSupabase(code);
+    throw new Error('Backend API client is not configured');
   }
 
   const { data } = await api.get(`/api/surprise/${code}`);
@@ -86,47 +88,68 @@ export const getSurprise = async (code: string): Promise<SurpriseData> => {
   return data;
 };
 
-export const sendReply = async (reply: Reply): Promise<void> => {
+export const getSurprise = async (code: string): Promise<SurpriseData> => {
   if (!api) {
-    const { error } = await supabase.from('replies').insert([reply]);
-    if (error) {
-      throw new Error(`Failed to create reply: ${error.message}`);
-    }
-    return;
+    return fetchSurpriseFromSupabase(code);
   }
 
-  await api.post('/api/replies', reply);
+  try {
+    return await fetchSurpriseFromApi(code);
+  } catch (error) {
+    console.warn('Backend API failed for surprise fetch. Falling back to Supabase.', error);
+    return fetchSurpriseFromSupabase(code);
+  }
+};
+
+export const sendReply = async (reply: Reply): Promise<void> => {
+  if (api) {
+    try {
+      await api.post('/api/replies', reply);
+      return;
+    } catch (error) {
+      console.warn('Backend API failed for reply submit. Falling back to Supabase.', error);
+    }
+  }
+
+  const { error } = await supabase.from('replies').insert([reply]);
+  if (error) {
+    throw new Error(`Failed to create reply: ${error.message}`);
+  }
 };
 
 export const getReplies = async (code: string): Promise<Reply[]> => {
-  if (!api) {
-    const { data: surprise, error: surpriseError } = await supabase
-      .from('surprises')
-      .select('id')
-      .eq('code', code)
-      .single<{ id: string }>();
+  if (api) {
+    try {
+      const { data } = await api.get(`/api/replies/${code}`);
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid API response format');
+      }
 
-    if (surpriseError || !surprise) {
-      throw new Error('Surprise not found');
+      return data;
+    } catch (error) {
+      console.warn('Backend API failed for replies fetch. Falling back to Supabase.', error);
     }
-
-    const { data: replies, error: repliesError } = await supabase
-      .from('replies')
-      .select('*')
-      .eq('surprise_id', surprise.id)
-      .order('created_at', { ascending: false });
-
-    if (repliesError) {
-      throw new Error(`Failed to fetch replies: ${repliesError.message}`);
-    }
-
-    return replies ?? [];
   }
 
-  const { data } = await api.get(`/api/replies/${code}`);
-  if (!Array.isArray(data)) {
-    throw new Error('Invalid API response format');
+  const { data: surprise, error: surpriseError } = await supabase
+    .from('surprises')
+    .select('id')
+    .eq('code', code)
+    .single<{ id: string }>();
+
+  if (surpriseError || !surprise) {
+    throw new Error('Surprise not found');
   }
 
-  return data;
+  const { data: replies, error: repliesError } = await supabase
+    .from('replies')
+    .select('*')
+    .eq('surprise_id', surprise.id)
+    .order('created_at', { ascending: false });
+
+  if (repliesError) {
+    throw new Error(`Failed to fetch replies: ${repliesError.message}`);
+  }
+
+  return replies ?? [];
 };
